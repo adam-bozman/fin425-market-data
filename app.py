@@ -217,7 +217,7 @@ def thin_border(color="BDD7EE"):
     s = Side(style="thin", color=color)
     return Border(top=s, bottom=s, left=s, right=s)
 
-def write_data_sheet(wb, sheet_name, df, ticker_label):
+def write_data_sheet(wb, sheet_name, df, ticker_label, frequency="1mo"):
     ws = wb.create_sheet(title=sheet_name)
     ws.sheet_view.showGridLines = False
 
@@ -237,6 +237,13 @@ def write_data_sheet(wb, sheet_name, df, ticker_label):
     keep = [c for c in ["Open","High","Low","Close","Adj. Close","Volume"] if c in df.columns]
     df = df[keep]
     df.index = pd.to_datetime(df.index).tz_localize(None)
+
+    # Weekly: yfinance labels bars with Monday (period start);
+    # Yahoo Finance website shows Friday (period end). Shift to match.
+    if frequency == "1wk":
+        df.index = df.index + pd.offsets.Week(weekday=4)  # 4 = Friday
+
+
 
     col_widths = {"Date": 14, "Open": 14, "High": 14, "Low": 14,
                   "Close": 14, "Adj. Close": 14, "Volume": 16}
@@ -389,9 +396,9 @@ def build_excel(firm_ticker, sp_ticker, rf_ticker, start, end, frequency,
                 df_firm, df_sp, df_rf):
     wb = openpyxl.Workbook()
     write_cover_sheet(wb, firm_ticker, sp_ticker, rf_ticker, start, end, frequency)
-    write_data_sheet(wb, "S&P 500",   df_sp,   sp_ticker)
-    write_data_sheet(wb, "Risk-Free", df_rf,   rf_ticker)
-    write_data_sheet(wb, firm_ticker, df_firm, firm_ticker)
+    write_data_sheet(wb, "S&P 500",   df_sp,   sp_ticker,   frequency)
+    write_data_sheet(wb, "Risk-Free", df_rf,   rf_ticker,   frequency)
+    write_data_sheet(wb, firm_ticker, df_firm, firm_ticker, frequency)
 
     buf = io.BytesIO()
     wb.save(buf)
