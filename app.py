@@ -238,10 +238,10 @@ def write_data_sheet(wb, sheet_name, df, ticker_label, frequency="1mo"):
     df = df[keep]
     df.index = pd.to_datetime(df.index).tz_localize(None)
 
-    # Weekly: yfinance labels bars with Monday (period start);
-    # Yahoo Finance website shows Friday (period end). Shift to match.
+    # Weekly: yfinance labels bars with the Sunday before the trading week;
+    # Yahoo Finance website shows the Monday that opens the week. Shift +1 day.
     if frequency == "1wk":
-        df.index = df.index + pd.offsets.Week(weekday=4)  # 4 = Friday
+        df.index = df.index + pd.DateOffset(days=1)
 
 
 
