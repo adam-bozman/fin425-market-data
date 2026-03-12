@@ -408,57 +408,19 @@ def build_excel(firm_ticker, sp_ticker, rf_ticker, start, end, frequency,
 
 # ── Fetch helper ──────────────────────────────────────────────
 @st.cache_data(show_spinner=False, ttl=3600)
-def fetch_rf(ticker, start, end, interval):
-    """Fetch risk-free rate: always pull daily then resample.
-    ^IRX pre-aggregated monthly/weekly data cuts off early in yfinance."""
-    df = yf.download(
-        ticker,
-        start=start,
-        end=end,
-        interval="1d",
-        auto_adjust=False,
-        progress=False,
-    )
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df.columns = [str(c) for c in df.columns]
-
-    if df.empty:
-        return df
-
-    # Resample to target frequency using period-end close (last trading day)
-    freq_map = {"1d": None, "1wk": "W-FRI", "1mo": "ME"}
-    resample_rule = freq_map.get(interval)
-
-    if resample_rule:
-        agg = {
-            "Open":  "first",
-            "High":  "max",
-            "Low":   "min",
-            "Close": "last",
-        }
-        # Only include columns that exist
-        agg = {k: v for k, v in agg.items() if k in df.columns}
-        if "Adj Close" in df.columns:
-            agg["Adj Close"] = "last"
-        if "Volume" in df.columns:
-            agg["Volume"] = "sum"
-        df = df.resample(resample_rule).agg(agg).dropna(subset=["Close"])
-
-    return df
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
 def fetch_data(ticker, start, end, interval):
+    # Add a small buffer so yfinance doesn't clip the most recent period.
+    # (yfinance treats `end` as exclusive and sometimes drops the last
+    # monthly/weekly bar when end == today.)
+    end_buf = end + datetime.timedelta(days=45)
     df = yf.download(
         ticker,
         start=start,
-        end=end,
+        end=end_buf,
         interval=interval,
         auto_adjust=False,
         progress=False,
     )
-    # Always return with flattened columns so cache stores clean data
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     df.columns = [str(c) for c in df.columns]
@@ -536,9 +498,7 @@ if not errors:
             try:
                 df_firm = fetch_data(firm_ticker, start_date, end_date, frequency)
                 df_sp   = fetch_data(SP_TICKER,   start_date, end_date, frequency)
-                # ^IRX monthly/weekly aggregation is incomplete in yfinance;
-                # fetch daily and resample ourselves for full coverage
-                df_rf   = fetch_rf(RF_TICKER, start_date, end_date, frequency)
+                df_rf   = fetch_data(RF_TICKER,   start_date, end_date, frequency)
 
                 if df_firm.empty:
                     st.error(f"No data found for **{firm_ticker}**. Check the ticker and try again.")
