@@ -424,6 +424,9 @@ def fetch_data(ticker, start, end, interval):
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     df.columns = [str(c) for c in df.columns]
+    # Trim back to the user's requested end date
+    if not df.empty:
+        df = df[df.index <= pd.Timestamp(end)]
     return df
 
 # ── UI ────────────────────────────────────────────────────────
